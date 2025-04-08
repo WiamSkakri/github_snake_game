@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Contribution Grid Snake Game</title>
+  <style>
+    body {
+      background-color: #0d1117;
+      color: #c9d1d9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 800px;
+      background-color: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .instructions {
+      margin: 20px 0;
+      padding: 10px;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      background-color: #0d1117;
+      width: 100%;
+      max-width: 520px;
+    }
+    
+    #github-snake-game {
+      margin-top: 20px;
+    }
+    
+    code {
+      background-color: #161b22;
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🐍 GitHub Contribution Grid Snake Game</h1>
+    
+    <div class="instructions">
+      <p><strong>How to play:</strong></p>
+      <ul>
+        <li>Click the Start Game button below</li>
+        <li>Use arrow keys to control the snake</li>
+        <li>Eat the highlighted green contribution squares to grow</li>
+        <li>Collect all contribution squares to win</li>
+        <li>Avoid hitting the walls or yourself</li>
+      </ul>
+    </div>
+    
+    <div id="github-snake-game"></div>
+  </div>
+
+  <script>
+    // GitHub Contribution Grid Snake Game
+    class GitHubSnakeGame {
+      constructor(containerId) {
+        this.container = document.getElementById(containerId);
+        this.canvas = document.createElement('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.container.appendChild(this.canvas);
+        
+        // Game state
+        this.gridSize = 10; // Size of each cell in pixels
+        this.rows = 7; // Weekdays (Mon-Sun)
+        this.cols = 52; // Weeks in a year
+        this.snake = []; // Snake segments
+        this.direction = 'right'; // Initial direction
+        this.food = null; // Food position
+        this.score = 0;
+        this.gameOver = false;
+        this.gameStarted = false;
+        this.contributionGrid = [];
+        this.originalContributionGrid = []; // Store original grid to reset game
+        this.speed = 150; // Milliseconds between moves
+        
+        // UI elements
+        this.startButton = null;
+        this.restartButton = null;
+        
+        // Setup and event listeners
+        this.setupCanvas();
+        this.addEventListeners();
+        this.fetchContributionData();
+      }
+      
+      setupCanvas() {
+        // Set canvas size to match contribution grid
+        this.canvas.width = this.cols * this.gridSize;
+        this.canvas.height = this.rows * this.gridSize;
+        this.canvas.style.border = '1px solid #2d333b';
+        this.canvas.style.backgroundColor = '#0d1117';
+      }
+      
+      addEventListeners() {
+        // Add keyboard controls
+        document.addEventListener('keydown', (e) => {
+          if (!this.gameStarted) return;
+          
+          switch(e.key) {
+            case 'ArrowUp':
+              if (this.direction !== 'down') this.direction = 'up';
+              break;
+            case 'ArrowDown':
+              if (this.direction !== 'up') this.direction = 'down';
+              break;
+            case 'ArrowLeft':
+              if (this.direction !== 'right') this.direction = 'left';
+              break;
+            case 'ArrowRight':
+              if (this.direction !== 'left') this.direction = 'right';
+              break;
+          }
+        });
+        
+        // Create button container
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.marginTop = '10px';
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.gap = '10px';
+        buttonContainer.style.justifyContent = 'center';
+        this.container.appendChild(buttonContainer);
+        
+        // Add start button
+        this.startButton = document.createElement('button');
+        this.startButton.innerText = 'Start Game';
+        this.startButton.style.padding = '8px 16px';
+        this.startButton.style.backgroundColor = '#238636';
+        this.startButton.style.color = 'white';
+        this.startButton.style.border = 'none';
+        this.startButton.style.borderRadius = '6px';
+        this.startButton.style.cursor = 'pointer';
+        this.startButton.addEventListener('click', () => this.startGame());
+        buttonContainer.appendChild(this.startButton);
+        
+        // Add restart button (initially hidden)
+        this.restartButton = document.createElement('button');
+        this.restartButton.innerText = 'Restart Game';
+        this.restartButton.style.padding = '8px 16px';
+        this.restartButton.style.backgroundColor = '#0969da';
+        this.restartButton.style.color = 'white';
+        this.restartButton.style.border = 'none';
+        this.restartButton.style.borderRadius = '6px';
+        this.restartButton.style.cursor = 'pointer';
+        this.restartButton.style.display = 'none'; // Hide initially
+        this.restartButton.addEventListener('click', () => this.restartGame());
+        buttonContainer.appendChild(this.restartButton);
+      }
+      
+      async fetchContributionData() {
+        // In a real implementation, you would fetch the actual contribution data
+        // For this demo, we'll generate a fake contribution grid similar to your image
+        this.contributionGrid = Array(this.rows).fill().map(() => 
+          Array(this.cols).fill(0)
+        );
+        
+        // Add some random "contributions" (1-4 intensity)
+        const contributionPattern = [
+          // August contributions
+          {row: 2, col: 16, value: 1},
+          {row: 3, col: 16, value: 1},
+          {row: 2, col: 17, value: 1},
+          {row: 3, col: 17, value: 1},
+          
+          // October contributions
+          {row: 2, col: 27, value: 1},
+          {row: 3, col: 27, value: 1},
+          {row: 4, col: 27, value: 1},
+          {row: 3, col: 28, value: 1},
+          
+          // December
+          {row: 0, col: 33, value: 1},
+          {row: 5, col: 36, value: 1},
+          
+          // February-March
+          {row: 0, col: 44, value: 1},
+          {row: 2, col: 45, value: 1},
+          {row: 1, col: 46, value: 1},
+          {row: 3, col: 46, value: 1},
+          {row: 5, col: 46, value: 1},
+          {row: 2, col: 47, value: 1},
+          {row: 4, col: 47, value: 1},
+          {row: 0, col: 48, value: 1},
+          {row: 5, col: 48, value: 1},
+          {row: 1, col: 49, value: 1},
+          {row: 6, col: 49, value: 1}
+        ];
+        
+        contributionPattern.forEach(({row, col, value}) => {
+          this.contributionGrid[row][col] = value;
+        });
+        
+        // Store original grid for resetting the game
+        this.originalContributionGrid = JSON.parse(JSON.stringify(this.contributionGrid));
+        
+        this.drawGrid();
+      }
+      
+      startGame() {
+        if (this.gameStarted) return;
+        
+        // Initialize snake in the top-left corner
+        this.snake = [{x: 1, y: 1}];
+        this.direction = 'right';
+        this.score = 0;
+        this.gameOver = false;
+        this.gameStarted = true;
+        
+        // Hide start button, show restart button
+        this.startButton.style.display = 'none';
+        this.restartButton.style.display = 'block';
+        
+        // Place food at a contribution cell
+        this.placeFood();
+        
+        // Start game loop
+        this.gameInterval = setInterval(() => this.gameLoop(), this.speed);
+      }
+      
+      restartGame() {
+        // Reset game state
+        clearInterval(this.gameInterval);
+        this.gameStarted = false;
+        this.gameOver = false;
+        
+        // Reset contribution grid to original state
+        this.contributionGrid = JSON.parse(JSON.stringify(this.originalContributionGrid));
+        
+        // Clear the canvas and redraw the grid
+        this.drawGrid();
+        
+        // Start the game again
+        this.startGame();
+      }
+      
+      placeFood() {
+        // Get all cells with contributions (value > 0) that haven't been eaten yet
+        const contributionCells = [];
+        for (let y = 0; y < this.rows; y++) {
+          for (let x = 0; x < this.cols; x++) {
+            if (this.contributionGrid[y][x] > 0) {
+              contributionCells.push({x, y});
+            }
+          }
+        }
+        
+        // Filter out cells where the snake currently is
+        const availableCells = contributionCells.filter(cell => 
+          !this.snake.some(segment => segment.x === cell.x && segment.y === cell.y)
+        );
+        
+        if (availableCells.length === 0) {
+          // No more food to place - you win!
+          this.win();
+          return;
+        }
+        
+        // Place food randomly on one of the contribution cells
+        this.food = availableCells[Math.floor(Math.random() * availableCells.length)];
+      }
+      
+      gameLoop() {
+        if (this.gameOver) {
+          clearInterval(this.gameInterval);
+          return;
+        }
+        
+        this.moveSnake();
+        this.checkCollision();
+        this.drawGrid();
+      }
+      
+      moveSnake() {
+        const head = {...this.snake[0]};
+        
+        // Move the head based on direction
+        switch(this.direction) {
+          case 'up':
+            head.y--;
+            break;
+          case 'down':
+            head.y++;
+            break;
+          case 'left':
+            head.x--;
+            break;
+          case 'right':
+            head.x++;
+            break;
+        }
+        
+        // Add new head to the beginning of snake array
+        this.snake.unshift(head);
+        
+        // If snake eats food, don't remove tail (snake grows) and mark the dot as eaten
+        if (this.food && head.x === this.food.x && head.y === this.food.y) {
+          this.score++;
+          // Mark the contribution as eaten (set to 0)
+          this.contributionGrid[this.food.y][this.food.x] = 0;
+          this.placeFood();
+        } else {
+          // Remove tail segment (snake moves forward)
+          this.snake.pop();
+        }
+      }
+      
+      checkCollision() {
+        const head = this.snake[0];
+        
+        // Check wall collision
+        if (
+          head.x < 0 || 
+          head.y < 0 || 
+          head.x >= this.cols || 
+          head.y >= this.rows
+        ) {
+          this.gameOver = true;
+        }
+        
+        // Check self collision (snake biting itself)
+        for (let i = 1; i < this.snake.length; i++) {
+          if (head.x === this.snake[i].x && head.y === this.snake[i].y) {
+            this.gameOver = true;
+            break;
+          }
+        }
+        
+        if (this.gameOver) {
+          this.showGameOver();
+        }
+      }
+      
+      win() {
+        this.gameOver = true;
+        clearInterval(this.gameInterval);
+        
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        this.ctx.fillStyle = '#238636';
+        this.ctx.font = '20px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('YOU WIN!', this.canvas.width / 2, this.canvas.height / 2);
+        this.ctx.fillText(`Score: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2 + 30);
+        
+        // Ensure restart button is visible
+        this.restartButton.style.display = 'block';
+      }
+      
+      showGameOver() {
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        this.ctx.fillStyle = '#f85149';
+        this.ctx.font = '20px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2);
+        this.ctx.fillText(`Score: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2 + 30);
+        
+        // Ensure restart button is visible
+        this.restartButton.style.display = 'block';
+      }
+      
+      drawGrid() {
+        // Clear canvas
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Draw the contribution grid
+        for (let y = 0; y < this.rows; y++) {
+          for (let x = 0; x < this.cols; x++) {
+            const value = this.contributionGrid[y][x];
+            
+            // Set color based on contribution intensity
+            if (value === 0) {
+              this.ctx.fillStyle = '#161b22'; // Empty cell
+            } else {
+              // Green intensity based on contribution level (1-4)
+              const intensity = Math.min(value, 4);
+              const greenColors = ['#0e4429', '#006d32', '#26a641', '#39d353'];
+              this.ctx.fillStyle = greenColors[intensity - 1];
+            }
+            
+            // Draw rectangle for this cell
+            this.ctx.fillRect(
+              x * this.gridSize, 
+              y * this.gridSize, 
+              this.gridSize - 1, 
+              this.gridSize - 1
+            );
+          }
+        }
+        
+        // Draw snake
+        this.snake.forEach((segment, index) => {
+          // Head is slightly different color
+          this.ctx.fillStyle = index === 0 ? '#58a6ff' : '#1f6feb';
+          this.ctx.fillRect(
+            segment.x * this.gridSize, 
+            segment.y * this.gridSize, 
+            this.gridSize - 1, 
+            this.gridSize - 1
+          );
+        });
+        
+        // Highlight the target green square (not a new red dot, just highlight an existing green one)
+        if (this.food) {
+          // Draw a pulsing highlight around the target green square
+          const pulseValue = Math.sin(Date.now() / 200) * 0.5 + 0.5;
+          this.ctx.strokeStyle = `rgba(255, 255, 255, ${pulseValue})`;
+          this.ctx.lineWidth = 2;
+          this.ctx.strokeRect(
+            this.food.x * this.gridSize + 1, 
+            this.food.y * this.gridSize + 1, 
+            this.gridSize - 3, 
+            this.gridSize - 3
+          );
+        }
+        
+        // Draw score
+        this.ctx.fillStyle = '#c9d1d9';
+        this.ctx.font = '14px Arial';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText(`Score: ${this.score}`, 10, 20);
+        
+        // If game is over, show message
+        if (this.gameOver) {
+          this.showGameOver();
+        }
+      }
+    }
+
+    // Initialize the game when the page loads
+    document.addEventListener('DOMContentLoaded', () => {
+      const game = new GitHubSnakeGame('github-snake-game');
+    });
+  </script>
+</body>
+</html>
